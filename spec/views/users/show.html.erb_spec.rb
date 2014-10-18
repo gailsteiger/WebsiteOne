@@ -19,7 +19,7 @@ describe 'users/show.html.erb' do
                               skill_list: [ 'Shooting', 'Hooting' ],
                               bio: 'Lonesome Cowboy')
 
-    @user.status.create(attributes = FactoryGirl.attributes_for(:status))
+    @user.status.build(attributes = FactoryGirl.attributes_for(:status))
 
     @commit_counts = [build_stubbed(:commit_count, project: @projects.first, user: @user, commit_count: 253)]
 
@@ -51,6 +51,45 @@ describe 'users/show.html.erb' do
     assign :youtube_videos, @youtube_videos
     @skills = ["rails", "ruby", "rspec"]
     assign :skills, @skills
+  end
+
+  describe 'user information tabs' do
+    it 'renders a tab view' do
+      render
+      expect(rendered).to have_css('ul#tabs')
+    end
+
+    it 'do not render tab About if user has no :bio' do
+      allow(@user).to receive(:bio?).and_return false
+      render
+      rendered.within('ul#tabs') do |section|
+        expect(section).to_not have_link 'About', href: '#about'
+      end
+    end
+
+    it 'do not render tab Skills if user has no :skill_list' do
+      allow(@user).to receive(:skill_list).and_return([])
+      render
+      rendered.within('ul#tabs') do |section|
+        expect(section).to_not have_link 'Skills', href: '#user-skills'
+      end
+    end
+
+    it 'do not render tab Projects if user has no :following_projects_count' do
+      allow(@user).to receive(:following_projects_count).and_return 0
+      render
+      rendered.within('ul#tabs') do |section|
+        expect(section).to_not have_link 'Projects', href: '#projects'
+      end
+    end
+
+    it 'do not render tab Activity if user has no :commit_count' do
+      allow(@user).to receive(:commit_counts).and_return []
+      render
+      rendered.within('ul#tabs') do |section|
+        expect(section).to_not have_link 'Activity', href: '#activity'
+      end
+    end
   end
 
   it 'renders a table wih video links if there are videos' do
@@ -92,13 +131,9 @@ describe 'users/show.html.erb' do
     expect(rendered).to have_content(@user.status.last[:status])
   end
 
-  it "prompts user to update their status" do
+  it 'prompts user to update their status' do
     render
-    # binding.pry
-    # within "div.modal-footer" do |footer|
-      # expect(rendered).to have_selector("input[type='submit'][value='Update status'")
-    expect(rendered).to have_selector("input", type: 'submit', value: 'Update status')
-    # end
+    expect(rendered).to have_selector('input', type: 'submit', value: 'Update status')
   end
 
   describe 'geolocation' do
@@ -190,9 +225,42 @@ describe 'users/show.html.erb' do
         sign_in @user_logged_in # method from devise:TestHelpers
     end
 
-    it 'displays an edit button if it is my profile' do
+    it 'not displays an edit button if it is my profile' do
       render
       expect(rendered).to_not have_xpath("//a[contains(@type, 'button')]")
+    end
+
+    it 'displays an edit butten if it is my profile' do
+      assign(:user, @user_logged_in)
+      render
+      expect(rendered).to have_xpath("//a[contains(@type, 'button')]")
+    end
+
+    it 'does not display New Newsletter link if it is my profile and I am not privileged' do
+      allow(@user).to receive(:is_privileged?).and_return(false)
+      render
+      expect(rendered).to_not have_link 'New Newsletter'
+    end
+  end
+
+  context '' do
+    before(:each) do
+      @other = FactoryGirl.create(:user)
+      @user = FactoryGirl.create(:user, email:'random@random.com')
+      sign_in @user
+    end
+
+    it 'displays New Newsletter link if it is my profile and I am privileged' do
+      # binding.pry
+      assign(:user, @user)
+      render
+      expect(rendered).to have_link 'New Newsletter'
+    end
+
+    it 'does not display newsletter link' do
+      assign(:user, @other)
+      render
+      expect(rendered).to_not have_link 'New Newsletter'
     end
   end
 
